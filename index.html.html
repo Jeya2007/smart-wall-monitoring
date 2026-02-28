@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Smart Wall Monitoring System — Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap');
+
+  :root {
+    --purple: #7C3AED;
+    --cyan: #06B6D4;
+    --green: #10B981;
+    --orange: #F97316;
+    --red: #EF4444;
+    --yellow: #FBBF24;
+    --dark: #0A0A1A;
+    --dark2: #111128;
+    --white: #FFFFFF;
+    --gray: #94A3B8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    font-family: 'Exo 2', sans-serif;
+    color: var(--white);
+    overflow: hidden;
+    width: 1280px;
+    height: 720px;
+    position: relative;
+  }
+
+  /* ── SCENE SYSTEM ── */
+  .scene {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .scene.active { opacity: 1; pointer-events: all; }
+
+  /* ── PROGRESS BAR ── */
+  #progress-bar {
+    position: fixed;
+    bottom: 0; left: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--purple), var(--cyan), var(--green));
+    width: 0%;
+    transition: width 0.3s linear;
+    z-index: 999;
+  }
+
+  /* ── SCENE COUNTER ── */
+  #scene-counter {
+    position: fixed;
+    bottom: 14px; right: 20px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    z-index: 999;
+    letter-spacing: 2px;
+  }
+
+  /* ── PLAY/PAUSE ── */
+  #controls {
+    position: fixed;
+    bottom: 10px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 12px;
+    z-index: 999;
+  }
+  .ctrl-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.2); }
+
+  /* ══════════════════════════════════
+     SCENE 0 — INTRO / TITLE
+  ══════════════════════════════════ */
+  #s0 { background: var(--dark); overflow: hidden; }
+
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(124,58,237,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,58,237,0.08) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridMove 8s linear infinite;
+  }
+  @keyframes gridMove { from { background-position: 0 0; } to { background-position: 60px 60px; } }
+
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: orbPulse 4s ease-in-out infinite alternate;
+  }
+  @keyframes orbPulse { from { transform: scale(1); opacity: 0.6; } to { transform: scale(1.15); opacity: 0.9; } }
+
+  .title-content { position: relative; z-index: 2; text-align: center; }
+
+  .hackathon-badge {
+    display: inline-block;
+    background: var(--purple);
+    color: var(--yellow);
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    padding: 6px 20px;
+    border-radius: 4px;
+    margin-bottom: 28px;
+    animation: fadeSlideDown 0.8s ease 0.3s both;
+  }
+
+  .main-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 68px;
+    font-weight: 900;
+    line-height: 1;
+    animation: fadeSlideUp 0.8s ease 0.6s both;
+  }
+  .main-title span { color: var(--cyan); display: block; font-size: 42px; margin-top: 8px; }
+
+  .tagline {
+    font-size: 16px;
+    color: rgba(255,255,255,0.65);
+    font-style: italic;
+    margin-top: 20px;
+    animation: fadeSlideUp 0.8s ease 0.9s both;
+  }
+
+  .stat-row {
+    display: flex; gap: 20px; justify-content: center;
+    margin-top: 36px;
+    animation: fadeSlideUp 0.8s ease 1.2s both;
+  }
+  .stat-box {
+    border: 1px solid;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+  }
+  .stat-box .val {
+    font-family: 'Orbitron', monospace;
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .stat-box .lbl { font-size: 10px; color: var(--gray); margin-top: 2px; letter-spacing: 1px; }
+
+  @keyframes fadeSlideDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: translateY(0); } }
+  @keyframes fadeSlideUp   { from { opacity:0; transform: translateY(20px);  } to { opacity:1; transform: translateY(0); } }
+
+  /* ══════════════════════════════════
+     SCENE 1 — PROBLEM
+  ══════════════════════════════════ */
+  #s1 { background: linear-gradient(135deg, #1a0a0a 0%, #0A0A1A 100%); }
+
+  .problem-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 1100px;
+  }
+
+  .section-header {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .section-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--red);
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 34px;
+    font-weight: 700;
+  }
+
+  .crisis-card {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex; align-items: center; gap: 20px;
+    animation: cardIn 0.5s ease both;
+  }
+  .crisis-icon { font-size: 42px; flex-shrink: 0; }
+  .crisis-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 30px;
+    font-weight: 900;
+    color: var(--red);
+  }
+  .crisis-desc { font-size: 13px; color: var(--gray); margin-top: 4px; }
+
+  @keyframes cardIn { from { opacity:0; transform: translateX(-30px); } to { opacity:1; transform: translateX(0); } }
+
+  /* ══════════════════════════════════
+     SCENE 2 — WHAT IS IT
+  ══════════════════════════════════ */
+  #s2 { background: linear-gradient(135deg, #0a0a1a 0%, #0d1117 100%); }
+
+  .what-layout { display: flex; gap: 40px; width: 1140px; align-items: center; }
+
+  .what-left { flex: 1; }
+  .what-right { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+  .big-definition {
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1));
+    border: 1px solid rgba(124,58,237,0.4);
+    border-radius: 16px;
+    padding: 32px;
+  }
+
+  .def-tag {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    margin-bottom: 12px;
+  }
+  .def-text {
+    font-size: 17px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.9);
+  }
+
+  .pillar-card {
+    background: rgba(255,255,255,0.04);
+    border-left: 4px solid;
+    border-radius: 0 12px 12px 0;
+    padding: 16px 20px;
+    animation: pillarIn 0.4s ease both;
+  }
+  @keyframes pillarIn { from { opacity:0; transform: translateX(30px); } to { opacity:1; transform: translateX(0); } }
+
+  .pillar-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .pillar-desc { font-size: 12px; color: var(--gray); line-height: 1.5; }
+
+  /* ══════════════════════════════════
+     SCENE 3 — FLOW DIAGRAM
+  ══════════════════════════════════ */
+  #s3 { background: var(--dark2); }
+
+  .flow-container { width: 1140px; }
+  .flow-header { text-align: center; margin-bottom: 32px; }
+
+  .flow-steps {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .flow-step {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative;
+    animation: stepPop 0.4s ease both;
+  }
+  @keyframes stepPop { from { opacity:0; transform: translateY(20px) scale(0.9); } to { opacity:1; transform: translateY(0) scale(1); } }
+
+  .step-circle {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    border: 3px solid;
+    position: relative; z-index: 2;
+    background: var(--dark);
+  }
+
+  .step-num {
+    position: absolute;
+    top: -8px; right: -8px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: white;
+    color: var(--dark);
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .step-line {
+    position: absolute;
+    top: 36px; left: 50%; right: -50%;
+    height: 3px;
+    z-index: 1;
+    transform-origin: left;
+    animation: lineGrow 0.4s ease both;
+  }
+  @keyframes lineGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  .step-title { font-size: 12px; font-weight: 700; margin-top: 12px; text-align: center; }
+  .step-desc { font-size: 10px; color: var(--gray); text-align: center; margin-top: 4px; line-height: 1.4; padding: 0 4px; }
+
+  /* Decision box */
+  .decision-row {
+    display: flex; justify-content: center; gap: 24px; margin-top: 16px;
+  }
+  .decision-box {
+    border-radius: 12px;
+    padding: 14px 28px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    animation: fadeSlideUp 0.5s ease 1.6s both;
+  }
+
+  /* ══════════════════════════════════
+     SCENE 4 — COMPONENTS
+  ══════════════════════════════════ */
+  #s4 { background: var(--dark); }
+
+  .comp-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    width: 1100px;
+  }
+
+  .comp-card {
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+    animation: cardPop 0.4s ease both;
+  }
+  @keyframes cardPop { from { opacity:0; transform: scale(0.9); } to { opacity:1; transform: scale(1); } }
+
+  .comp-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .comp-icon { font-size: 28px; }
+  .comp-title { font-weight: 700; font-size: 15px; }
+  .comp-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: rgba(255,255,255,0.8);
+    margin-bottom: 6px;
+  }
+  .comp-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ══════════════════════════════════
+     SCENE 5 — LIVE SIMULATION
+  ══════════════════════════════════ */
+  #s5 { background: var(--dark2); }
+
+  .dashboard { width: 1140px; }
+  .dash-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px;
+  }
+  .live-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(16,185,129,0.15);
+    border: 1px solid rgba(16,185,129,0.4);
+    color: var(--green);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'Orbitron', monospace;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    animation: blink 1s ease infinite;
+  }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+
+  .sensors-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .sensor-card {
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: border-color 0.3s;
+  }
+  .sensor-card.warning {
+    border-color: var(--red);
+    background: rgba(239,68,68,0.1);
+    animation: warningPulse 0.5s ease infinite alternate;
+  }
+  @keyframes warningPulse { from { box-shadow: 0 0 0 rgba(239,68,68,0); } to { box-shadow: 0 0 20px rgba(239,68,68,0.4); } }
+
+  .sensor-label { font-size: 11px; color: var(--gray); letter-spacing: 1px; margin-bottom: 8px; }
+  .sensor-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    transition: color 0.3s;
+  }
+  .sensor-unit { font-size: 12px; color: var(--gray); margin-top: 4px; }
+
+  .sensor-bar-bg {
+    height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 12px;
+  }
+  .sensor-bar {
+    height: 4px; border-radius: 2px;
+    transition: width 0.5s ease, background 0.3s;
+  }
+
+  .status-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .status-card {
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .status-icon-wrap {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .status-title { font-weight: 700; font-size: 13px; }
+  .status-sub { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+  /* ══════════════════════════════════
+     SCENE 6 — ALERT TRIGGER
+  ══════════════════════════════════ */
+  #s6 { background: var(--dark); overflow: hidden; }
+
+  .alert-overlay {
+    position: absolute; inset: 0;
+    background: rgba(239,68,68,0.05);
+    animation: alertFlash 0.5s ease infinite alternate;
+  }
+  @keyframes alertFlash { from { background: rgba(239,68,68,0.03); } to { background: rgba(239,68,68,0.12); } }
+
+  .alert-content { position: relative; z-index: 2; width: 1100px; }
+
+  .alert-banner {
+    background: linear-gradient(135deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1));
+    border: 2px solid var(--red);
+    border-radius: 16px;
+    padding: 24px 32px;
+    display: flex; align-items: center; gap: 24px;
+    margin-bottom: 24px;
+    animation: alertBannerIn 0.6s ease both;
+  }
+  @keyframes alertBannerIn { from { opacity:0; transform: scale(0.95); } to { opacity:1; transform: scale(1); } }
+
+  .alert-icon-big { font-size: 52px; animation: shake 0.4s ease infinite alternate; }
+  @keyframes shake { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+
+  .alert-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--red);
+  }
+  .alert-detail { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 6px; }
+
+  .alert-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .action-card {
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    animation: actionCardIn 0.4s ease both;
+  }
+  @keyframes actionCardIn { from { opacity:0; transform: translateY(30px); } to { opacity:1; transform: translateY(0); } }
+
+  .action-icon { font-size: 36px; margin-bottom: 10px; }
+  .action-title { font-weight: 700; font-size: 14px; }
+  .action-sub { font-size: 11px; margin-top: 4px; opacity: 0.7; }
+
+  /* ══════════════════════════════════
+     SCENE 7 — UNIQUENESS
+  ══════════════════════════════════ */
+  #s7 { background: var(--dark); }
+
+  .unique-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    width: 1100px;
+  }
+
+  .unique-card {
+    border-radius: 12px;
+    padding: 22px;
+    border-left: 5px solid;
+    background: rgba(255,255,255,0.03);
+    animation: uniqueIn 0.4s ease both;
+  }
+  @keyframes uniqueIn { from { opacity:0; transform: translateX(-20px); } to { opacity:1; transform: translateX(0); } }
+
+  .unique-icon { font-size: 30px; margin-bottom: 10px; }
+  .unique-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .unique-desc { font-size: 12px; color: rgba(255,255,255,0.7); line-height: 1.5; }
+
+  /* ══════════════════════════════════
+     SCENE 8 — BUDGET
+  ══════════════════════════════════ */
+  #s8 { background: var(--dark2); }
+
+  .budget-layout { display: flex; gap: 32px; width: 1140px; }
+  .budget-left { flex: 1.4; }
+  .budget-right { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+  .budget-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .budget-table th {
+    background: var(--orange);
+    padding: 10px 12px;
+    text-align: left;
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .budget-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .budget-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .budget-table .total-row td {
+    background: var(--green);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .price-col { color: var(--green); font-family: 'Orbitron', monospace; }
+
+  .cost-hero {
+    background: linear-gradient(135deg, var(--green), #059669);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+  .cost-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 42px;
+    font-weight: 900;
+  }
+  .cost-lbl { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+  .saving-box {
+    background: rgba(124,58,237,0.2);
+    border: 1px solid var(--purple);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+  }
+  .saving-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 38px;
+    font-weight: 900;
+    color: var(--yellow);
+  }
+  .saving-lbl { font-size: 12px; color: var(--gray); margin-top: 4px; }
+
+  .vs-box {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .vs-label { font-size: 12px; color: var(--gray); }
+  .vs-val { font-family: 'Orbitron', monospace; font-size: 14px; color: var(--red); font-weight: 700; }
+
+  /* ══════════════════════════════════
+     SCENE 9 — CLOSING
+  ══════════════════════════════════ */
+  #s9 { background: var(--dark); overflow: hidden; }
+
+  .closing-content { position: relative; z-index: 2; text-align: center; width: 900px; }
+
+  .closing-badge {
+    display: inline-block;
+    background: var(--green);
+    color: var(--dark);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    padding: 8px 24px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+    animation: fadeSlideDown 0.6s ease 0.2s both;
+  }
+
+  .closing-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 52px;
+    font-weight: 900;
+    line-height: 1.1;
+    animation: fadeSlideUp 0.6s ease 0.4s both;
+  }
+  .closing-title span { color: var(--cyan); display: block; }
+
+  .closing-tagline {
+    font-size: 18px;
+    color: rgba(255,255,255,0.65);
+    margin: 20px 0 36px;
+    animation: fadeSlideUp 0.6s ease 0.6s both;
+  }
+
+  .links-row {
+    display: flex; gap: 16px; justify-content: center;
+    animation: fadeSlideUp 0.6s ease 0.8s both;
+    margin-bottom: 36px;
+  }
+  .link-chip {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Orbitron', monospace;
+    letter-spacing: 1px;
+  }
+
+  .deadline-strip {
+    background: var(--purple);
+    border-radius: 12px;
+    padding: 14px 32px;
+    font-size: 14px;
+    animation: fadeSlideUp 0.6s ease 1.0s both;
+  }
+  .deadline-strip span { color: var(--yellow); font-weight: 700; }
+
+  .final-team {
+    margin-top: 24px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    animation: fadeSlideUp 0.6s ease 1.2s both;
+    font-family: 'Orbitron', monospace;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- PROGRESS -->
+<div id="progress-bar"></div>
+<div id="scene-counter">01 / 10</div>
+<div id="controls">
+  <button class="ctrl-btn" onclick="prevScene()">◀ PREV</button>
+  <button class="ctrl-btn" id="playBtn" onclick="togglePlay()">⏸ PAUSE</button>
+  <button class="ctrl-btn" onclick="nextScene()">NEXT ▶</button>
+</div>
+
+<!-- ══ SCENE 0: TITLE ══ -->
+<div class="scene active" id="s0">
+  <div class="grid-bg"></div>
+  <div class="orb" style="width:500px;height:500px;background:radial-gradient(circle,rgba(124,58,237,0.5),transparent);top:-100px;left:-100px;animation-duration:5s;"></div>
+  <div class="orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(6,182,212,0.4),transparent);bottom:-80px;right:-80px;animation-duration:6s;animation-direction:alternate-reverse;"></div>
+  <div class="title-content">
+    <div class="hackathon-badge">⚡ QUANTUMARD NATIONAL HACKATHON 2026 — PHASE 2</div>
+    <div class="main-title">
+      SMART WALL
+      <span>MONITORING SYSTEM</span>
+    </div>
+    <div class="tagline">IoT-Powered Structural Health Intelligence</div>
+    <div class="stat-row">
+      <div class="stat-box" style="border-color:rgba(124,58,237,0.5);background:rgba(124,58,237,0.1);">
+        <div class="val" style="color:var(--purple)">4+</div>
+        <div class="lbl">SENSORS</div>
+      </div>
+      <div class="stat-box" style="border-color:rgba(6,182,212,0.5);background:rgba(6,182,212,0.1);">
+        <div class="val" style="color:var(--cyan)">24/7</div>
+        <div class="lbl">MONITORING</div>
+      </div>
+      <div class="stat-box" style="border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.1);">
+        <div class="val" style="color:var(--green)">5s</div>
+        <div class="lbl">ALERT SPEED</div>
+      </div>
+      <div class="stat-box" style="border-color:rgba(251,191,36,0.5);background:rgba(251,191,36,0.1);">
+        <div class="val" style="color:var(--yellow)">₹2,640</div>
+        <div class="lbl">TOTAL COST</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 1: PROBLEM ══ -->
+<div class="scene" id="s1">
+  <div class="problem-grid">
+    <div class="section-header">
+      <div class="section-label">THE CRISIS WE'RE SOLVING</div>
+      <div class="section-title">Why Structures Fail — <span style="color:var(--red)">Silently</span></div>
+    </div>
+    <div class="crisis-card" style="animation-delay:0.1s">
+      <div class="crisis-icon">🏚️</div>
+      <div>
+        <div class="crisis-val">5,000+</div>
+        <div class="crisis-desc">Building collapses globally per year</div>
+      </div>
+    </div>
+    <div class="crisis-card" style="animation-delay:0.2s">
+      <div class="crisis-icon">⚠️</div>
+      <div>
+        <div class="crisis-val">40%</div>
+        <div class="crisis-desc">Failures from undetected micro-cracks</div>
+      </div>
+    </div>
+    <div class="crisis-card" style="animation-delay:0.3s">
+      <div class="crisis-icon">💸</div>
+      <div>
+        <div class="crisis-val">$250B</div>
+        <div class="crisis-desc">Annual global infrastructure repair cost</div>
+      </div>
+    </div>
+    <div class="crisis-card" style="animation-delay:0.4s">
+      <div class="crisis-icon">⏰</div>
+      <div>
+        <div class="crisis-val">72hrs</div>
+        <div class="crisis-desc">Average time to detect structural damage</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 2: WHAT IS IT ══ -->
+<div class="scene" id="s2">
+  <div class="what-layout">
+    <div class="what-left">
+      <div class="section-label" style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:var(--cyan);margin-bottom:12px;">WHAT IS THIS SYSTEM?</div>
+      <div class="section-title" style="font-family:'Orbitron',monospace;font-size:30px;font-weight:700;margin-bottom:20px;">Smart Wall<br><span style="color:var(--cyan)">Monitoring System</span></div>
+      <div class="big-definition">
+        <div class="def-tag">DEFINITION</div>
+        <div class="def-text">
+          An <strong style="color:var(--cyan)">autonomous IoT device</strong> that attaches to walls and structures — continuously sensing, analysing, and alerting about structural health conditions <strong style="color:var(--yellow)">without human intervention</strong>. It detects cracks, vibration, moisture & temperature in real time.
+        </div>
+      </div>
+    </div>
+    <div class="what-right">
+      <div class="pillar-card" style="border-color:var(--purple);animation-delay:0.1s">
+        <div class="pillar-title" style="color:var(--purple)">📡 Sensing Layer</div>
+        <div class="pillar-desc">4 sensors capture crack width, vibration amplitude, moisture %, and temperature — simultaneously, every 5 seconds.</div>
+      </div>
+      <div class="pillar-card" style="border-color:var(--cyan);animation-delay:0.2s">
+        <div class="pillar-title" style="color:var(--cyan)">🧠 Processing Brain</div>
+        <div class="pillar-desc">Arduino Uno + NodeMCU read all sensor inputs, apply threshold logic, and decide when danger exists.</div>
+      </div>
+      <div class="pillar-card" style="border-color:var(--orange);animation-delay:0.3s">
+        <div class="pillar-title" style="color:var(--orange)">🚨 Alert Engine</div>
+        <div class="pillar-desc">Buzzer activates, SMS sent via GSM, cloud dashboard flags — all within 5 seconds of threshold breach.</div>
+      </div>
+      <div class="pillar-card" style="border-color:var(--green);animation-delay:0.4s">
+        <div class="pillar-title" style="color:var(--green)">☁️ Cloud Analytics</div>
+        <div class="pillar-desc">ThingSpeak stores 30-day history. MATLAB visualisation. Accessible globally from any device.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 3: FLOW ══ -->
+<div class="scene" id="s3">
+  <div class="flow-container">
+    <div class="flow-header">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:var(--orange);margin-bottom:8px;">SYSTEM WORKFLOW</div>
+      <div style="font-family:'Orbitron',monospace;font-size:30px;font-weight:700;">How It Works — <span style="color:var(--orange)">6 Steps</span></div>
+    </div>
+    <div class="flow-steps">
+      <div class="flow-step" style="animation-delay:0.0s">
+        <div class="step-circle" style="border-color:var(--purple);color:var(--purple)">
+          📌<div class="step-num" style="background:var(--purple);color:white">1</div>
+        </div>
+        <div class="step-line" style="background:linear-gradient(90deg,var(--purple),var(--blue,#3B82F6));animation-delay:0.3s"></div>
+        <div class="step-title" style="color:var(--purple)">Sensor Attach</div>
+        <div class="step-desc">Adhesive-mounted sensors on wall surface</div>
+      </div>
+      <div class="flow-step" style="animation-delay:0.15s">
+        <div class="step-circle" style="border-color:#3B82F6;color:#3B82F6">
+          📊<div class="step-num" style="background:#3B82F6;color:white">2</div>
+        </div>
+        <div class="step-line" style="background:linear-gradient(90deg,#3B82F6,var(--cyan));animation-delay:0.45s"></div>
+        <div class="step-title" style="color:#3B82F6">Data Capture</div>
+        <div class="step-desc">Crack, vibration, moisture, temp every 5s</div>
+      </div>
+      <div class="flow-step" style="animation-delay:0.3s">
+        <div class="step-circle" style="border-color:var(--cyan);color:var(--cyan)">
+          🔬<div class="step-num" style="background:var(--cyan);color:white">3</div>
+        </div>
+        <div class="step-line" style="background:linear-gradient(90deg,var(--cyan),var(--orange));animation-delay:0.6s"></div>
+        <div class="step-title" style="color:var(--cyan)">MCU Process</div>
+        <div class="step-desc">Arduino reads & converts sensor values</div>
+      </div>
+      <div class="flow-step" style="animation-delay:0.45s">
+        <div class="step-circle" style="border-color:var(--orange);color:var(--orange)">
+          ⚖️<div class="step-num" style="background:var(--orange);color:white">4</div>
+        </div>
+        <div class="step-line" style="background:linear-gradient(90deg,var(--orange),var(--green));animation-delay:0.75s"></div>
+        <div class="step-title" style="color:var(--orange)">Threshold Check</div>
+        <div class="step-desc">Compare vs safety limits in code</div>
+      </div>
+      <div class="flow-step" style="animation-delay:0.6s">
+        <div class="step-circle" style="border-color:var(--green);color:var(--green)">
+          ☁️<div class="step-num" style="background:var(--green);color:white">5</div>
+        </div>
+        <div class="step-line" style="background:linear-gradient(90deg,var(--green),var(--red));animation-delay:0.9s"></div>
+        <div class="step-title" style="color:var(--green)">Cloud Upload</div>
+        <div class="step-desc">NodeMCU sends to ThingSpeak</div>
+      </div>
+      <div class="flow-step" style="animation-delay:0.75s">
+        <div class="step-circle" style="border-color:var(--red);color:var(--red)">
+          🚨<div class="step-num" style="background:var(--red);color:white">6</div>
+        </div>
+        <div class="step-title" style="color:var(--red)">Alert Triggered</div>
+        <div class="step-desc">Buzzer + SMS + App notify instantly</div>
+      </div>
+    </div>
+    <div class="decision-row">
+      <div class="decision-box" style="background:rgba(16,185,129,0.15);border:1px solid var(--green);color:var(--green);">
+        ✅ Normal → Continue monitoring loop
+      </div>
+      <div class="decision-box" style="background:rgba(239,68,68,0.15);border:1px solid var(--red);color:var(--red);">
+        🚨 Threshold Exceeded → ALERT + Log to Cloud
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 4: COMPONENTS ══ -->
+<div class="scene" id="s4">
+  <div style="width:1100px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:var(--purple);margin-bottom:8px">HARDWARE STACK</div>
+      <div style="font-family:'Orbitron',monospace;font-size:30px;font-weight:700">Components Used</div>
+    </div>
+    <div class="comp-grid">
+      <div class="comp-card" style="background:rgba(124,58,237,0.08);border-color:rgba(124,58,237,0.3);animation-delay:0.0s">
+        <div class="comp-header">
+          <div class="comp-icon">🔬</div>
+          <div>
+            <div class="comp-title" style="color:var(--purple)">Microcontrollers</div>
+          </div>
+        </div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--purple)"></div>Arduino Uno R3 — Main CPU</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--purple)"></div>NodeMCU ESP8266 — Wi-Fi MCU</div>
+      </div>
+      <div class="comp-card" style="background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.3);animation-delay:0.1s">
+        <div class="comp-header">
+          <div class="comp-icon">📡</div>
+          <div>
+            <div class="comp-title" style="color:#3B82F6">Sensors (×4 Types)</div>
+          </div>
+        </div>
+        <div class="comp-item"><div class="comp-dot" style="background:#3B82F6"></div>Flex/Strain — crack detection</div>
+        <div class="comp-item"><div class="comp-dot" style="background:#3B82F6"></div>SW-420 — vibration</div>
+        <div class="comp-item"><div class="comp-dot" style="background:#3B82F6"></div>FC-28 — moisture</div>
+        <div class="comp-item"><div class="comp-dot" style="background:#3B82F6"></div>DHT11 — temperature</div>
+      </div>
+      <div class="comp-card" style="background:rgba(6,182,212,0.08);border-color:rgba(6,182,212,0.3);animation-delay:0.2s">
+        <div class="comp-header">
+          <div class="comp-icon">📶</div>
+          <div>
+            <div class="comp-title" style="color:var(--cyan)">Communication</div>
+          </div>
+        </div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--cyan)"></div>ESP8266 Wi-Fi (primary)</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--cyan)"></div>SIM800L GSM (fallback)</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--cyan)"></div>I2C sensor bus protocol</div>
+      </div>
+      <div class="comp-card" style="background:rgba(249,115,22,0.08);border-color:rgba(249,115,22,0.3);animation-delay:0.3s">
+        <div class="comp-header">
+          <div class="comp-icon">🔔</div>
+          <div>
+            <div class="comp-title" style="color:var(--orange)">Output & Alerts</div>
+          </div>
+        </div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--orange)"></div>5V Passive Buzzer</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--orange)"></div>16×2 LCD Display</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--orange)"></div>Red/Green LED indicators</div>
+      </div>
+      <div class="comp-card" style="background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.3);animation-delay:0.4s">
+        <div class="comp-header">
+          <div class="comp-icon">⚡</div>
+          <div>
+            <div class="comp-title" style="color:var(--green)">Power Supply</div>
+          </div>
+        </div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--green)"></div>9V DC Adapter</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--green)"></div>7805 Voltage Regulator</div>
+        <div class="comp-item"><div class="comp-dot" style="background:var(--green)"></div>Capacitor filtering</div>
+      </div>
+      <div class="comp-card" style="background:rgba(79,70,229,0.08);border-color:rgba(79,70,229,0.3);animation-delay:0.5s">
+        <div class="comp-header">
+          <div class="comp-icon">☁️</div>
+          <div>
+            <div class="comp-title" style="color:var(--indigo,#4F46E5)">Cloud Platform</div>
+          </div>
+        </div>
+        <div class="comp-item"><div class="comp-dot" style="background:#4F46E5"></div>ThingSpeak IoT analytics</div>
+        <div class="comp-item"><div class="comp-dot" style="background:#4F46E5"></div>MATLAB visualisation</div>
+        <div class="comp-item"><div class="comp-dot" style="background:#4F46E5"></div>Blynk mobile app alerts</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 5: LIVE DASHBOARD ══ -->
+<div class="scene" id="s5">
+  <div class="dashboard">
+    <div class="dash-header">
+      <div>
+        <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:var(--cyan);margin-bottom:6px">LIVE SENSOR DASHBOARD</div>
+        <div style="font-family:'Orbitron',monospace;font-size:24px;font-weight:700">Real-Time Monitoring</div>
+      </div>
+      <div class="live-badge">
+        <div class="live-dot"></div> LIVE — Updating every 5s
+      </div>
+    </div>
+    <div class="sensors-grid">
+      <div class="sensor-card" id="crackCard">
+        <div class="sensor-label">CRACK SENSOR</div>
+        <div class="sensor-val" id="crackVal" style="color:var(--green)">0.2</div>
+        <div class="sensor-unit">mm deformation</div>
+        <div class="sensor-bar-bg"><div class="sensor-bar" id="crackBar" style="width:15%;background:var(--green)"></div></div>
+      </div>
+      <div class="sensor-card" id="vibCard">
+        <div class="sensor-label">VIBRATION</div>
+        <div class="sensor-val" id="vibVal" style="color:var(--green)">142</div>
+        <div class="sensor-unit">ADC units</div>
+        <div class="sensor-bar-bg"><div class="sensor-bar" id="vibBar" style="width:28%;background:var(--green)"></div></div>
+      </div>
+      <div class="sensor-card" id="moistCard">
+        <div class="sensor-label">MOISTURE</div>
+        <div class="sensor-val" id="moistVal" style="color:var(--cyan)">38</div>
+        <div class="sensor-unit">% humidity</div>
+        <div class="sensor-bar-bg"><div class="sensor-bar" id="moistBar" style="width:38%;background:var(--cyan)"></div></div>
+      </div>
+      <div class="sensor-card" id="tempCard">
+        <div class="sensor-label">TEMPERATURE</div>
+        <div class="sensor-val" id="tempVal" style="color:var(--orange)">29</div>
+        <div class="sensor-unit">°C</div>
+        <div class="sensor-bar-bg"><div class="sensor-bar" id="tempBar" style="width:58%;background:var(--orange)"></div></div>
+      </div>
+    </div>
+    <div class="status-row">
+      <div class="status-card">
+        <div class="status-icon-wrap" style="background:rgba(16,185,129,0.15);">☁️</div>
+        <div>
+          <div class="status-title" style="color:var(--green)">Cloud Connected</div>
+          <div class="status-sub">ThingSpeak ● Last sync: 2s ago</div>
+        </div>
+      </div>
+      <div class="status-card">
+        <div class="status-icon-wrap" style="background:rgba(6,182,212,0.15);">📶</div>
+        <div>
+          <div class="status-title" style="color:var(--cyan)">Wi-Fi Active</div>
+          <div class="status-sub">Signal: Strong ● IP: 192.168.1.45</div>
+        </div>
+      </div>
+      <div class="status-card">
+        <div class="status-icon-wrap" style="background:rgba(16,185,129,0.15);">✅</div>
+        <div>
+          <div class="status-title" style="color:var(--green)">All Systems Normal</div>
+          <div class="status-sub">No threshold breaches detected</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 6: ALERT TRIGGER ══ -->
+<div class="scene" id="s6">
+  <div class="alert-overlay"></div>
+  <div class="alert-content">
+    <div class="alert-banner">
+      <div class="alert-icon-big">🚨</div>
+      <div>
+        <div class="alert-title">⚠️ STRUCTURAL ALERT TRIGGERED!</div>
+        <div class="alert-detail">Crack Sensor exceeded safety threshold → Value: <strong style="color:var(--red)">2.8mm</strong> (Limit: 1.5mm) — Location: Wall Section A3 — Time: 14:32:07</div>
+      </div>
+    </div>
+    <div class="alert-actions">
+      <div class="action-card" style="background:rgba(239,68,68,0.15);border:1px solid var(--red);animation-delay:0.1s">
+        <div class="action-icon">🔔</div>
+        <div class="action-title" style="color:var(--red)">Buzzer Activated</div>
+        <div class="action-sub" style="color:var(--gray)">On-site alarm<br>triggered instantly</div>
+      </div>
+      <div class="action-card" style="background:rgba(249,115,22,0.15);border:1px solid var(--orange);animation-delay:0.2s">
+        <div class="action-icon">📱</div>
+        <div class="action-title" style="color:var(--orange)">SMS Sent</div>
+        <div class="action-sub" style="color:var(--gray)">Alert to +91XXXXXX<br>via SIM800L GSM</div>
+      </div>
+      <div class="action-card" style="background:rgba(16,185,129,0.15);border:1px solid var(--green);animation-delay:0.3s">
+        <div class="action-icon">☁️</div>
+        <div class="action-title" style="color:var(--green)">Cloud Logged</div>
+        <div class="action-sub" style="color:var(--gray)">ThingSpeak flagged<br>with warning tag</div>
+      </div>
+      <div class="action-card" style="background:rgba(6,182,212,0.15);border:1px solid var(--cyan);animation-delay:0.4s">
+        <div class="action-icon">📲</div>
+        <div class="action-title" style="color:var(--cyan)">App Notified</div>
+        <div class="action-sub" style="color:var(--gray)">Blynk push alert<br>to mobile dashboard</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 7: UNIQUENESS ══ -->
+<div class="scene" id="s7">
+  <div style="width:1100px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:var(--pink,#EC4899);margin-bottom:8px">COMPETITIVE ADVANTAGE</div>
+      <div style="font-family:'Orbitron',monospace;font-size:30px;font-weight:700">What Makes Us <span style="color:var(--yellow)">UNIQUE?</span></div>
+    </div>
+    <div class="unique-grid">
+      <div class="unique-card" style="border-color:var(--purple);animation-delay:0.0s">
+        <div class="unique-icon">🔗</div>
+        <div class="unique-title" style="color:var(--purple)">Multi-Sensor Fusion</div>
+        <div class="unique-desc">4 sensor types in ONE device. No competitor at this price point combines crack + vibration + moisture + temperature.</div>
+      </div>
+      <div class="unique-card" style="border-color:var(--cyan);animation-delay:0.1s">
+        <div class="unique-icon">☁️</div>
+        <div class="unique-title" style="color:var(--cyan)">Real-Time Cloud Sync</div>
+        <div class="unique-desc">Live data every 5 seconds accessible globally. 30-day history for trend analysis and predictive maintenance.</div>
+      </div>
+      <div class="unique-card" style="border-color:var(--green);animation-delay:0.2s">
+        <div class="unique-icon">💰</div>
+        <div class="unique-title" style="color:var(--green)">Sub-₹3,000 Cost</div>
+        <div class="unique-desc">99.7% cheaper than enterprise SHM systems costing ₹5–50 Lakhs. Delivers 80% of equivalent functionality.</div>
+      </div>
+      <div class="unique-card" style="border-color:var(--orange);animation-delay:0.3s">
+        <div class="unique-icon">🔧</div>
+        <div class="unique-title" style="color:var(--orange)">Zero-Infra Retrofit</div>
+        <div class="unique-desc">Adhesive-mounted. No drilling, rewiring, or civil work needed. Deployable on any existing wall in 30 minutes.</div>
+      </div>
+      <div class="unique-card" style="border-color:#3B82F6;animation-delay:0.4s">
+        <div class="unique-icon">🤖</div>
+        <div class="unique-title" style="color:#3B82F6">AI-Ready Architecture</div>
+        <div class="unique-desc">Threshold logic is fully extensible. LSTM models for vibration pattern prediction can be integrated directly.</div>
+      </div>
+      <div class="unique-card" style="border-color:var(--red);animation-delay:0.5s">
+        <div class="unique-icon">📡</div>
+        <div class="unique-title" style="color:var(--red)">Dual-Comms Redundancy</div>
+        <div class="unique-desc">Wi-Fi primary + GSM fallback. Alerts reach users even when internet fails — critical in post-disaster scenarios.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 8: BUDGET ══ -->
+<div class="scene" id="s8">
+  <div class="budget-layout">
+    <div class="budget-left">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:var(--orange);margin-bottom:8px">BILL OF MATERIALS</div>
+      <div style="font-family:'Orbitron',monospace;font-size:24px;font-weight:700;margin-bottom:16px">Financial Budget</div>
+      <table class="budget-table">
+        <tr>
+          <th>#</th><th>Component</th><th>Qty</th><th>Unit ₹</th><th>Total ₹</th>
+        </tr>
+        <tr><td>1</td><td>Arduino Uno R3</td><td>1</td><td>450</td><td class="price-col">450</td></tr>
+        <tr><td>2</td><td>NodeMCU ESP8266</td><td>1</td><td>350</td><td class="price-col">350</td></tr>
+        <tr><td>3</td><td>Flex/Strain Sensor</td><td>2</td><td>120</td><td class="price-col">240</td></tr>
+        <tr><td>4</td><td>Vibration SW-420</td><td>2</td><td>60</td><td class="price-col">120</td></tr>
+        <tr><td>5</td><td>Moisture FC-28</td><td>2</td><td>80</td><td class="price-col">160</td></tr>
+        <tr><td>6</td><td>Temp Sensor DHT11</td><td>2</td><td>75</td><td class="price-col">150</td></tr>
+        <tr><td>7</td><td>GSM SIM800L</td><td>1</td><td>420</td><td class="price-col">420</td></tr>
+        <tr><td>8</td><td>Buzzer + LCD + LEDs</td><td>—</td><td>200</td><td class="price-col">200</td></tr>
+        <tr><td>9</td><td>Power + PCB + Misc</td><td>—</td><td>550</td><td class="price-col">550</td></tr>
+        <tr class="total-row"><td colspan="4">TOTAL PROTOTYPE COST</td><td>₹ 2,640</td></tr>
+      </table>
+    </div>
+    <div class="budget-right">
+      <div class="cost-hero">
+        <div style="font-size:13px;opacity:0.85;margin-bottom:4px">COMPLETE PROTOTYPE</div>
+        <div class="cost-val">₹ 2,640</div>
+        <div class="cost-lbl">All components included</div>
+      </div>
+      <div class="vs-box">
+        <div class="vs-label">Manual Inspection</div>
+        <div class="vs-val">₹5,000+ / visit</div>
+      </div>
+      <div class="vs-box">
+        <div class="vs-label">Enterprise SHM</div>
+        <div class="vs-val">₹5–50 Lakhs</div>
+      </div>
+      <div class="saving-box">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px">COST SAVING</div>
+        <div class="saving-val">99.7%</div>
+        <div class="saving-lbl">vs Commercial SHM Products</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCENE 9: CLOSING ══ -->
+<div class="scene" id="s9">
+  <div class="orb" style="width:600px;height:600px;background:radial-gradient(circle,rgba(124,58,237,0.4),transparent);top:-150px;left:-150px;"></div>
+  <div class="orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(6,182,212,0.35),transparent);bottom:-100px;right:-100px;animation-direction:alternate-reverse;"></div>
+  <div class="closing-content">
+    <div class="closing-badge">✅ BUILD ROUND READY</div>
+    <div class="closing-title">
+      Detect Early.
+      <span>Save Lives. 🧱</span>
+    </div>
+    <div class="closing-tagline">Smart Wall Monitoring System — IoT-Powered Structural Health Intelligence</div>
+    <div class="links-row">
+      <div class="link-chip" style="background:var(--purple);">🔗 GitHub Repository</div>
+      <div class="link-chip" style="background:var(--cyan);color:var(--dark);">🎥 Demo Video (Drive)</div>
+      <div class="link-chip" style="background:var(--green);">🌐 Live Demo Link</div>
+    </div>
+    <div class="deadline-strip">
+      🗓️ Submission Deadline: <span>28 February 2026 — 11:59 PM IST</span> &nbsp;|&nbsp; Submit at: <span>forms.gle/jCRqgbpeMVXPgzUT7</span>
+    </div>
+    <div class="final-team">TEAM QUANTUMARD — QUANTUMARD NATIONAL HACKATHON 2026</div>
+  </div>
+</div>
+
+<script>
+  const SCENES = document.querySelectorAll('.scene');
+  const DURATIONS = [5000, 5000, 5500, 5500, 5000, 4000, 5000, 5500, 5500, 6000];
+  let current = 0;
+  let timer = null;
+  let playing = true;
+
+  function showScene(n) {
+    SCENES.forEach(s => s.classList.remove('active'));
+    SCENES[n].classList.add('active');
+    current = n;
+    document.getElementById('scene-counter').textContent =
+      String(n + 1).padStart(2,'0') + ' / ' + String(SCENES.length).padStart(2,'0');
+    updateProgress();
+    if (n === 5) startSensorSim();
+  }
+
+  function updateProgress() {
+    const pct = ((current + 1) / SCENES.length) * 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+  }
+
+  function nextScene() {
+    clearTimeout(timer);
+    const next = (current + 1) % SCENES.length;
+    showScene(next);
+    if (playing) scheduleNext();
+  }
+
+  function prevScene() {
+    clearTimeout(timer);
+    const prev = (current - 1 + SCENES.length) % SCENES.length;
+    showScene(prev);
+    if (playing) scheduleNext();
+  }
+
+  function scheduleNext() {
+    timer = setTimeout(nextScene, DURATIONS[current] || 5000);
+  }
+
+  function togglePlay() {
+    playing = !playing;
+    document.getElementById('playBtn').textContent = playing ? '⏸ PAUSE' : '▶ PLAY';
+    if (playing) scheduleNext();
+    else clearTimeout(timer);
+  }
+
+  // ── SENSOR SIMULATION FOR SCENE 5 ──────────────────────
+  let sensorTimer = null;
+  let simStep = 0;
+
+  function startSensorSim() {
+    clearInterval(sensorTimer);
+    simStep = 0;
+    sensorTimer = setInterval(updateSensors, 800);
+  }
+
+  function updateSensors() {
+    simStep++;
+    // Gradually increase crack sensor to trigger warning
+    const crackVals  = [0.2, 0.4, 0.6, 0.9, 1.1, 1.4, 1.8, 2.1];
+    const vibVals    = [142, 158, 171, 165, 180, 220, 270, 290];
+    const moistVals  = [38, 40, 42, 45, 48, 51, 55, 58];
+    const tempVals   = [29, 30, 31, 32, 33, 34, 35, 36];
+
+    const i = Math.min(simStep - 1, crackVals.length - 1);
+    const crack = crackVals[i];
+    const vib   = vibVals[i];
+    const moist = moistVals[i];
+    const temp  = tempVals[i];
+
+    const isWarning = crack >= 1.5;
+
+    // Update crack
+    document.getElementById('crackVal').textContent = crack.toFixed(1);
+    document.getElementById('crackVal').style.color = isWarning ? 'var(--red)' : 'var(--green)';
+    document.getElementById('crackBar').style.width = (crack / 3 * 100) + '%';
+    document.getElementById('crackBar').style.background = isWarning ? 'var(--red)' : 'var(--green)';
+    document.getElementById('crackCard').className = 'sensor-card' + (isWarning ? ' warning' : '');
+
+    // Update vibration
+    document.getElementById('vibVal').textContent = vib;
+    document.getElementById('vibVal').style.color = vib > 250 ? 'var(--orange)' : 'var(--green)';
+    document.getElementById('vibBar').style.width = (vib / 500 * 100) + '%';
+    document.getElementById('vibBar').style.background = vib > 250 ? 'var(--orange)' : 'var(--green)';
+
+    // Update moisture
+    document.getElementById('moistVal').textContent = moist;
+    document.getElementById('moistVal').style.color = moist > 50 ? 'var(--orange)' : 'var(--cyan)';
+    document.getElementById('moistBar').style.width = moist + '%';
+
+    // Update temp
+    document.getElementById('tempVal').textContent = temp;
+    document.getElementById('tempBar').style.width = (temp / 60 * 100) + '%';
+
+    // Update status
+    const statusEl = document.querySelector('#s5 .status-card:last-child .status-title');
+    const statusSubEl = document.querySelector('#s5 .status-card:last-child .status-sub');
+    const iconEl = document.querySelector('#s5 .status-card:last-child .status-icon-wrap');
+    if (isWarning) {
+      statusEl.textContent = '⚠️ ALERT — Crack Threshold Exceeded!';
+      statusEl.style.color = 'var(--red)';
+      statusSubEl.textContent = 'Crack: ' + crack + 'mm — Limit: 1.5mm';
+      iconEl.style.background = 'rgba(239,68,68,0.2)';
+    } else {
+      statusEl.textContent = 'All Systems Normal';
+      statusEl.style.color = 'var(--green)';
+      statusSubEl.textContent = 'No threshold breaches detected';
+      iconEl.style.background = 'rgba(16,185,129,0.15)';
+    }
+
+    if (simStep >= crackVals.length) clearInterval(sensorTimer);
+  }
+
+  // ── START ────────────────────────────────────────────
+  showScene(0);
+  scheduleNext();
+</script>
+</body>
+</html>
